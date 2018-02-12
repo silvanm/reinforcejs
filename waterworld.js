@@ -102,7 +102,7 @@ var World = function() {
   
   // set up food and poison
   this.items = []
-  for(var k=0;k<50;k++) {
+  for(var k=0;k<10;k++) {
     var x = randf(20, this.W-20);
     var y = randf(20, this.H-20);
     var t = randi(1, 3); // food or poison (1 and 2)
