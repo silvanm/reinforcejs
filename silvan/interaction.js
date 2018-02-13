@@ -2,6 +2,10 @@ var canvas, ctx;
 var agentView = false;
 var humanControls = false;
 
+const numAgents = 4;
+
+let w;
+
 // Draw everything
 function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -31,20 +35,24 @@ function draw() {
         ctx.arc(a.op.x, a.op.y, a.rad, 0, Math.PI * 2, true);
         ctx.fill();
         ctx.stroke();
+        ctx.fillText(a.id, a.op.x, a.op.y);
 
         // draw agents sight
         for (var ei = 0, ne = a.eyes.length; ei < ne; ei++) {
             var e = a.eyes[ei];
             var sr = e.sensed_proximity;
-            if (e.sensed_type === -1 || e.sensed_type === 0) {
+            if (e.sensed_type === -1 || e.sensed_type === COLLISIONTYPE.WALL) {
                 ctx.strokeStyle = "rgb(200,200,200)"; // wall or nothing
             }
-            if (e.sensed_type === 1) {
+            if (e.sensed_type === COLLISIONTYPE.APPLE) {
                 ctx.strokeStyle = "rgb(255,150,150)";
             } // apples
-            if (e.sensed_type === 2) {
+            if (e.sensed_type === COLLISIONTYPE.POISON) {
                 ctx.strokeStyle = "rgb(150,255,150)";
             } // poison
+            if (e.sensed_type === COLLISIONTYPE.AGENT) {
+                ctx.strokeStyle = "rgb(0,0,255)";
+            } // agent
             ctx.beginPath();
             ctx.moveTo(a.op.x, a.op.y);
             ctx.lineTo(a.op.x + sr * Math.sin(a.oangle + e.angle),
@@ -119,15 +127,18 @@ var nflot = 1000;
 
 function initFlot() {
     var container = $("#flotreward");
-    var res = getFlotRewards(0);
-    var res1 = getFlotRewards(1);
-    series = [{
-        data: res,
-        lines: {fill: true}
-    }, {
-        data: res1,
-        lines: {fill: true}
-    }];
+
+    res = [];
+    series = [];
+
+    for (let i = 0; i < numAgents; i++) {
+        res.push(getFlotRewards(i));
+        series.push({
+            data: res[i],
+            lines: {fill: false}
+        })
+    }
+
     var plot = $.plot(container, series, {
         grid: {
             borderWidth: 1,
@@ -152,7 +163,7 @@ function initFlot() {
         }
     });
     setInterval(function () {
-        for (var i = 0; i < w.agents.length; i++) {
+        for (var i = 0; i < series.length; i++) {
             series[i].data = getFlotRewards(i);
         }
         plot.setData(series);
@@ -173,6 +184,11 @@ function getFlotRewards(agentId) {
 }
 
 var simspeed = 2;
+
+// global world object
+let current_interval_id;
+
+let skipdraw;
 
 function goveryfast() {
     window.clearInterval(current_interval_id);
@@ -258,7 +274,7 @@ var humanAction = -1;
 function enableHuman() {
     if (!humanControls) {
         humanControls = true;
-        var a = new Agent();
+        var a = new Agent('HUMAN');
         a.forward = function () {
             this.action = humanAction;
             humanAction = -1;
@@ -273,20 +289,17 @@ function enableHuman() {
     }
 }
 
-var w; // global world object
-var current_interval_id;
-var skipdraw = false;
-
 function start() {
     canvas = document.getElementById("canvas");
     ctx = canvas.getContext("2d");
+    ctx.font = "30px Arial";
 
     eval($("#agentspec").val());
 
     w = new World();
     w.agents = [];
-    for (var k = 0; k < 1; k++) {
-        var a = new Agent();
+    for (var k = 0; k < numAgents; k++) {
+        var a = new Agent(k);
         env = a;
         a.brain = new RL.DQNAgent(env, spec); // give agent a TD brain
         //a.brain = new RL.RecurrentReinforceAgent(env, {});
@@ -314,9 +327,13 @@ function start() {
 
 function updateStats() {
     var stats = "<ul>";
+    ``
     for (var i = 0; i < w.agents.length; i++) {
-        stats += "<li>Player " + (i + 1) + ": " + w.agents[i].apples + " apples, " + w.agents[i].poison + " poison</li>";
+        stats += "<li>Player " + w.agents[i].id + ": " + w.agents[i].apples + " apples, ";
+        stats += w.agents[i].poison + " poison, " + w.agents[i].agents + " agents, " +
+             w.agents[i].totalReward + " total</li>";
     }
+    stats += `Clock: ${w.clock}`;
     stats += "</ul>";
     $("#apples_and_poison").html(stats);
 }

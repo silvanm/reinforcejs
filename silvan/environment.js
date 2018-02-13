@@ -1,3 +1,22 @@
+const COLLISIONTYPE = {
+    WALL: 0,
+    APPLE: 1,
+    POISON: 2,
+    AGENT: 3
+}
+
+const POISON_ENABLED = true;
+
+const NUMITEMS = 30;
+
+const REWARD = {
+    AGENT : 0,
+    APPLE : 1,
+    POISON : -1,
+}
+
+const NEW_ITEM_PROBABILTY = 0.7;
+
 let addNewItems = true;
 
 var randf = function (lo, hi) {
@@ -99,7 +118,7 @@ var util_add_box = function (lst, x, y, w, h) {
 // item is circle thing on the floor that agent can interact with (see or eat, etc)
 var Item = function (x, y, type) {
     this.p = new Vec(x, y); // position
-    this.v = new Vec(0, Math.random() * 2 - 2.5);
+    this.v = new Vec(Math.random() * 2 - 2.5, Math.random() * 2 - 2.5);
     this.type = type;
     this.rad = 10; // default radius
     this.age = 0;
@@ -126,10 +145,14 @@ var World = function () {
 
     // set up food and poison
     this.items = [];
-    for (var k = 0; k < 50; k++) {
+    for (var k = 0; k < NUMITEMS; k++) {
         var x = randf(20, this.W - 20);
         var y = randf(20, this.H - 20);
-        var t = randi(1, 3); // food or poison (1 and 2)
+
+        if (POISON_ENABLED)
+            var t = randi(1, 3); // food or poison (1 and 2)
+        else
+            var t = COLLISIONTYPE.APPLE;
         var it = new Item(x, y, t);
         this.items.push(it);
     }
@@ -137,7 +160,7 @@ var World = function () {
 
 World.prototype = {
     // helper function to get closest colliding walls/items
-    stuff_collide_: function (p1, p2, check_walls, check_items) {
+    stuff_collide_: function (p1, p2, check_walls, check_items, check_agents, agentUnderTest) {
         var minres = false;
 
         // collide with walls
@@ -182,6 +205,32 @@ World.prototype = {
             }
         }
 
+        // collide with agents
+        if (check_agents) {
+            for (var i = 0, n = this.agents.length; i < n; i++) {
+                var targetAgent = this.agents[i];
+
+                if (targetAgent === agentUnderTest)
+                    continue;
+
+                var res = line_point_intersect(p1, p2, targetAgent.p, targetAgent.rad);
+                if (res) {
+                    // console.log(`Collision ${agentUnderTest.id}=>${targetAgent.id}. Dist=${res.up.dist_from(p1)}`);
+                    res.type = COLLISIONTYPE.AGENT; // store type of item. 3 == agent
+                    res.vx = targetAgent.v.x; // velocty information
+                    res.vy = targetAgent.v.y;
+                    if (!minres) {
+                        minres = res;
+                    }
+                    else {
+                        if (res.ua < minres.ua) {
+                            minres = res;
+                        }
+                    }
+                }
+            }
+        }
+
         return minres;
     },
     tick: function () {
@@ -198,7 +247,7 @@ World.prototype = {
                 // we have a line from p to p->eyep
                 var eyep = new Vec(a.p.x + e.max_range * Math.sin(a.angle + e.angle),
                     a.p.y + e.max_range * Math.cos(a.angle + e.angle));
-                var res = this.stuff_collide_(a.p, eyep, true, true);
+                var res = this.stuff_collide_(a.p, eyep, true, true, false, a);
                 if (res) {
                     // eye collided with wall
                     e.sensed_proximity = res.up.dist_from(a.p);
@@ -211,6 +260,7 @@ World.prototype = {
                         e.vy = 0;
                     }
                 } else {
+                    // no collision
                     e.sensed_proximity = e.max_range;
                     e.sensed_type = -1;
                     e.vx = 0;
@@ -291,6 +341,25 @@ World.prototype = {
             var a = this.agents[j];
             a.digestion_signal = 0; // important - reset this!
         }
+
+        // Collision with agents
+        for (var i = 0, n = this.agents.length; i < n; i++) {
+            var a = this.agents[i];
+
+            for (var j = 0, m = this.agents.length; j < m; j++) {
+                var b = this.agents[j];
+                if (i === j)
+                    continue;
+
+                var d = a.p.dist_from(b.p);
+                if (d < b.rad + a.rad) {
+                    console.log('Collision with agents');
+                    a.digestion_signal += REWARD.AGENT; // Collision with agent
+                    a.agents++;
+                }
+            }
+        }
+
         for (var i = 0, n = this.items.length; i < n; i++) {
             var it = this.items[i];
             it.age += 1;
@@ -307,11 +376,11 @@ World.prototype = {
                     if (!rescheck) {
                         // ding! nom nom nom
                         if (it.type === 1) {
-                            a.digestion_signal += 1.0; // mmm delicious apple
+                            a.digestion_signal += REWARD.APPLE; // mmm delicious apple
                             a.apples++;
                         }
                         if (it.type === 2) {
-                            a.digestion_signal += -1.0; // ewww poison
+                            a.digestion_signal += REWARD.POISON; // ewww poison
                             a.poison++;
                         }
                         it.cleanup_ = true;
@@ -347,6 +416,11 @@ World.prototype = {
             }
 
         }
+
+        for (var i = 0, n = this.agents.length; i < n; i++) {
+            this.agents[i].totalReward += this.agents[i].digestion_signal;
+        }
+
         if (update_items) {
             var nt = [];
             for (var i = 0, n = this.items.length; i < n; i++) {
@@ -358,10 +432,14 @@ World.prototype = {
 
         // Add new items
         if (addNewItems) {
-            if (this.items.length < 50 && this.clock % 10 === 0 && randf(0, 1) < 0.25) {
+            if (this.items.length < 50 && this.clock % 10 === 0 && randf(0, 1) < NEW_ITEM_PROBABILTY) {
                 var newitx = randf(20, this.W - 20);
                 var newity = randf(20, this.H - 20);
-                var newitt = randi(1, 3); // food or poison (1 and 2)
+
+                if (POISON_ENABLED)
+                    var newitt = randi(1, 3); // food or poison (1 and 2)
+                else
+                    var newitt = COLLISIONTYPE.APPLE;
                 var newit = new Item(newitx, newity, newitt);
                 this.items.push(newit);
             }
@@ -374,8 +452,12 @@ World.prototype = {
     }
 };
 
+const STATE_PER_EYE = 6;
+
 // Eye sensor has a maximum range and senses walls
 var Eye = function (angle) {
+    
+
     this.angle = angle; // angle relative to agent its on
     this.max_range = 120;
     this.sensed_proximity = 120; // what the eye is seeing. will be set in world.tick()
@@ -385,8 +467,9 @@ var Eye = function (angle) {
 };
 
 // A single agent
-var Agent = function () {
+var Agent = function (id) {
 
+    this.id = id;
     // positional information
     this.p = new Vec(300, 300);
     this.v = new Vec(0, 0);
@@ -396,8 +479,8 @@ var Agent = function () {
     this.actions = [];
     this.actions.push(0);
     this.actions.push(1);
-    //this.actions.push(2); // up
-    //this.actions.push(3); // down
+    this.actions.push(2); // up
+    this.actions.push(3); // down
 
     // properties
     this.rad = 10;
@@ -413,12 +496,15 @@ var Agent = function () {
 
     this.apples = 0;
     this.poison = 0;
+    this.agents = 0;
+
+    this.totalReward = 0;
 
     // outputs on world
     this.action = 0;
 
     this.prevactionix = -1;
-    this.num_states = this.eyes.length * 5 + 2;
+    this.num_states = this.eyes.length * STATE_PER_EYE + 2;
 };
 Agent.prototype = {
     getNumStates: function () {
@@ -431,19 +517,20 @@ Agent.prototype = {
         // in forward pass the agent simply behaves in the environment
         // create input to brain
         var num_eyes = this.eyes.length;
-        var ne = num_eyes * 5;
+        var ne = num_eyes * STATE_PER_EYE;
         var input_array = new Array(this.num_states);
         for (var i = 0; i < num_eyes; i++) {
             var e = this.eyes[i];
-            input_array[i * 5] = 1.0;
-            input_array[i * 5 + 1] = 1.0;
-            input_array[i * 5 + 2] = 1.0;
-            input_array[i * 5 + 3] = e.vx; // velocity information of the sensed target
-            input_array[i * 5 + 4] = e.vy;
+            input_array[i * STATE_PER_EYE] = 1.0; // wall
+            input_array[i * STATE_PER_EYE + 1] = 1.0; // food
+            input_array[i * STATE_PER_EYE + 2] = 1.0; // poison
+            input_array[i * STATE_PER_EYE + 3] = 1.0; // other
+            input_array[i * STATE_PER_EYE + 4] = e.vx; // velocity information of the sensed target
+            input_array[i * STATE_PER_EYE + 5] = e.vy;
             if (e.sensed_type !== -1) {
                 // sensed_type is 0 for wall, 1 for food and 2 for poison.
                 // lets do a 1-of-k encoding into the input array
-                input_array[i * 5 + e.sensed_type] = e.sensed_proximity / e.max_range; // normalize to [0,1]
+                input_array[i * STATE_PER_EYE + e.sensed_type] = e.sensed_proximity / e.max_range; // normalize to [0,1]
             }
         }
         // proprioception and orientation
