@@ -10,9 +10,9 @@ const POISON_ENABLED = true;
 const NUMITEMS = 0;
 
 const REWARD = {
-    AGENT : 0,
-    APPLE : 1,
-    POISON : -1,
+    AGENT: 0,
+    APPLE: 1,
+    POISON: -1,
 }
 
 const NEW_ITEM_PROBABILTY = 0.7;
@@ -74,10 +74,23 @@ var line_intersect = function (p1, p2, p3, p4) {
     var ub = ((p2.x - p1.x) * (p1.y - p3.y) - (p2.y - p1.y) * (p1.x - p3.x)) / denom;
     if (ua > 0.0 && ua < 1.0 && ub > 0.0 && ub < 1.0) {
         var up = new Vec(p1.x + ua * (p2.x - p1.x), p1.y + ua * (p2.y - p1.y));
-        return {ua: ua, ub: ub, up: up}; // up is intersection point
+        return {ua: ua, ub: ub, up: up, collisionWithId: null}; // up is intersection point
     }
     return false;
 };
+
+var intersec_angle = function (p1, p2, p3, p4) {
+    let v1 = {
+        x: p2.x - p1.x,
+        y: p2.y - p1.y
+    }
+    let v2 = {
+        x: p4.x - p3.x,
+        y: p4.y - p3.y
+    }
+
+    return Math.acos((v1.x * v2.y + v1.y * v2.x) / Math.sqrt(v1.x * v1.x + v1.y * v1.y) / Math.sqrt(v2.x * v2.x + v2.y * v2.y))
+}
 
 var line_point_intersect = function (p1, p2, p0, rad) {
     var v = new Vec(p2.y - p1.y, -(p2.x - p1.x)); // perpendicular vector
@@ -102,18 +115,20 @@ var line_point_intersect = function (p1, p2, p0, rad) {
 };
 
 // Wall is made up of two points
-var Wall = function (p1, p2, reward) {
+var Wall = function (id, p1, p2, reward) {
+    this.id = id;
     this.p1 = p1;
     this.p2 = p2;
     this.reward = reward;
 };
 
-// World object contains many agents and walls and food and stuff
 var util_add_box = function (lst, x, y, w, h) {
-    lst.push(new Wall(new Vec(x, y), new Vec(x + w, y), -1)); // north
-    lst.push(new Wall(new Vec(x + w, y), new Vec(x + w, y + h), 1)); // east
-    lst.push(new Wall(new Vec(x + w, y + h), new Vec(x, y + h), -1)); // south
-    lst.push(new Wall(new Vec(x, y + h), new Vec(x, y), 0)); // west
+    lst.push(new Wall('north', new Vec(x, y), new Vec(x + w, y), -1)); // north
+    lst.push(new Wall('east', new Vec(x + w, y), new Vec(x + w, y + h), -1)); // east
+    lst.push(new Wall('south', new Vec(x + w, y + h), new Vec(x, y + h), -1)); // south
+    lst.push(new Wall('west top', new Vec(x, y + h / 2), new Vec(x, y), -1)); // west bottom
+    lst.push(new Wall('west bottom', new Vec(x, y + h), new Vec(x, y + h / 2), 1)); // west top
+    lst.push(new Wall('middle', new Vec(x, y + h / 2), new Vec(x + w * 0.7, y + h / 2), -1));
 };
 
 // item is circle thing on the floor that agent can interact with (see or eat, etc)
@@ -137,12 +152,6 @@ var World = function () {
     this.walls = [];
     var pad = 0;
     util_add_box(this.walls, pad, pad, this.W - pad * 2, this.H - pad * 2);
-    /*
-    util_add_box(this.walls, 100, 100, 200, 300); // inner walls
-    this.walls.pop();
-    util_add_box(this.walls, 400, 100, 200, 300);
-    this.walls.pop();
-    */
 
     // set up food and poison
     this.items = [];
@@ -170,7 +179,8 @@ World.prototype = {
                 var wall = this.walls[i];
                 var res = line_intersect(p1, p2, wall.p1, wall.p2);
                 if (res) {
-                    res.type = wall.reward == -1 ? COLLISIONTYPE.BADWALL : COLLISIONTYPE.WALL ; // 0 is wall
+                    res.type = wall.reward == -1 ? COLLISIONTYPE.BADWALL : COLLISIONTYPE.WALL; // 0 is wall
+                    res.collisionWithId = wall.id
                     if (!minres) {
                         minres = res;
                     }
@@ -240,9 +250,14 @@ World.prototype = {
 
         // fix input to all agents based on environment
         // process eyes
-        this.collpoints = [];
+        /* let wallCollison = {
+             id : null,
+             type : null
+         };*/
+
         for (var i = 0, n = this.agents.length; i < n; i++) {
             var a = this.agents[i];
+            a.digestion_signal = 0;
             for (var ei = 0, ne = a.eyes.length; ei < ne; ei++) {
                 var e = a.eyes[ei];
                 // we have a line from p to p->eyep
@@ -252,6 +267,13 @@ World.prototype = {
                 if (res) {
                     // eye collided with wall
                     e.sensed_proximity = res.up.dist_from(a.p);
+
+                    /*        if ((e.sensed_proximity < a.rad) && (res.type===COLLISIONTYPE.WALL || res.type===COLLISIONTYPE.BADWALL)) {
+                                console.log(`Collision with wall ${res.collisionWithId}`);
+                                wallCollison.id = res.collisionWithId;
+                                wallCollison.type = res.type;
+                            }
+        */
                     e.sensed_type = res.type;
                     if ('vx' in res) {
                         e.vx = res.vx;
@@ -282,9 +304,9 @@ World.prototype = {
             a.oangle = a.angle; // and angle
 
             // execute agent's desired action
-            var speed = 4;
+            var speed = 1;
 
-            console.log(a.action)
+            //console.log(a.action)
             if (a.action === 1) { // brake
                 a.v += -speed;
                 if (a.v < 0)
@@ -304,148 +326,77 @@ World.prototype = {
             // forward the agent by velocity
             a.v *= 0.95; // friction
 
-            // new position
-            a.p.x += a.v * Math.cos(a.angle);
-            a.p.y += a.v * Math.sin(a.angle);
+            let plannedNewPos = new Vec(a.p.x + a.v * Math.cos(a.angle), a.p.y + a.v * Math.sin(a.angle));
 
-            // handle boundary conditions.. bounce agent
-            if (a.p.x < 1) { // hit to left wall
-                a.p.x = 1;
-                a.v.x = 0;
-                a.v.y = 0;
-            }
-            if (a.p.x > this.W - 1) { // hit right wall
-                a.p.x = this.W - 1;
-                a.v.x = 0;
-                a.v.y = 0;
-            }
-            if (a.p.y < 1) {
-                a.p.y = 1;
-                a.v.x = 0;
-                a.v.y = 0;
-            }
-            if (a.p.y > this.H - 1) {
-                a.p.y = this.H - 1;
-                a.v.x = 0;
-                a.v.y = 0;
+            // detect wall collision by prolonging the speed vectors with the directions
+            speedVector = {
+                p1: new Vec(a.p.x, a.p.y),
+                p2: plannedNewPos
             }
 
-            // if(a.p.x<0) { a.p.x= this.W -1; };
-            // if(a.p.x>this.W) { a.p.x= 1; }
-            // if(a.p.y<0) { a.p.y= this.H -1; };
-            // if(a.p.y>this.H) { a.p.y= 1; };
-        }
-
-        // tick all items
-        var update_items = false;
-        for (var j = 0, m = this.agents.length; j < m; j++) {
-            var a = this.agents[j];
-            a.digestion_signal = 0; // important - reset this!
-        }
-
-        // Collision with agents
-        for (var i = 0, n = this.agents.length; i < n; i++) {
-            var a = this.agents[i];
-
-            for (var j = 0, m = this.agents.length; j < m; j++) {
-                var b = this.agents[j];
-                if (i === j)
-                    continue;
-
-                var d = a.p.dist_from(b.p);
-                if (d < b.rad + a.rad) {
-                    console.log('Collision with agents');
-                    a.digestion_signal += REWARD.AGENT; // Collision with agent
-                    a.agents++;
+            let wallCollisionData = false
+            let wallCollisionId = null
+            let collisionAngle = null
+            this.walls.forEach((wall) => {
+                res = line_intersect(speedVector.p1, speedVector.p2, wall.p1, wall.p2)
+                if (res) {
+                    wallCollisionId = wall.id
+                    wallCollisionData = res
+                    collisionAngle = intersec_angle(speedVector.p1, speedVector.p2, wall.p1, wall.p2)
                 }
-            }
-        }
+            })
 
-        // collision with right wall
-        this.agents.forEach((agent) => {
-            if (agent.p.x >= this.W - 1) {
-                agent.p.x = 0
-                agent.p.y = this.H / 2
-                agent.digestion_signal += 1 // reward for hitting the right wall
-                agent.wall++;
-                //console.log("Hit the right wall")
-            }
+            if (wallCollisionData) {
 
-            if (agent.p.y <= 1 || agent.p.y >= this.H-1) {
-                agent.digestion_signal += -0.2 // reward for hitting any other walls
-                agent.badwall++;
-                //console.log("Hit the left, top or bottom wall")
-            }
-        })
 
-        for (var i = 0, n = this.items.length; i < n; i++) {
-            var it = this.items[i];
-            it.age += 1;
+                console.log(`Collision angle: ${collisionAngle / 6.28 * 360}`)
 
-            // see if some agent gets lunch
-            for (var j = 0, m = this.agents.length; j < m; j++) {
-                var a = this.agents[j];
-                var d = a.p.dist_from(it.p);
-                if (d < it.rad + a.rad) {
+                if (wallCollisionId === 'west bottom') {
+                    a.digestion_signal = 1; // reward for hitting the right wall
+                    a.wall++;
+                    a.p.x = 0;
+                    a.p.y = this.H / 4;
+                    a.v = 1
+                    a.angle = 0
+                    console.log(`Collision with wall ${wallCollisionId}`)
+                } else {
+                    a.digestion_signal = -0.2 // reward for hitting a wall
 
-                    // wait lets just make sure that this isn't through a wall
-                    //var rescheck = this.stuff_collide_(a.p, it.p, true, false);
-                    var rescheck = false;
-                    if (!rescheck) {
-                        // ding! nom nom nom
-                        if (it.type === 1) {
-                            a.digestion_signal += REWARD.APPLE; // mmm delicious apple
-                            a.apples++;
+                    if (wallCollisionId === 'north') {
+                        a.angle = 0
+                        a.p.y = this.H / 10
+                    } else if (wallCollisionId === 'east') {
+                        a.angle = Math.PI * 0.5
+                        a.p.x = this.W * 0.9
+                    } else if (wallCollisionId === 'south') {
+                        a.angle = -Math.PI
+                        a.p.y = this.H * 0.9
+                    } else if (wallCollisionId === 'west top') {
+                        a.angle = 0
+                    } else if (wallCollisionId === 'middle') {
+                        if (a.p.y > this.H / 2) {
+                            // below middle line
+                            a.angle = -Math.PI
+                            a.p.y = this.H * 0.55
+                        } else {
+                            a.angle = 0
+                            a.p.y = this.H * 0.45
                         }
-                        if (it.type === 2) {
-                            a.digestion_signal += REWARD.POISON; // ewww poison
-                            a.poison++;
-                        }
-                        it.cleanup_ = true;
-                        update_items = true;
-                        break; // break out of loop, item was consumed
                     }
+
+
+                    a.badwall++;
+                    console.log(`Collision with badwall ${wallCollisionId}`)
                 }
+            } else {
+                // new position
+                a.p.x = plannedNewPos.x
+                a.p.y = plannedNewPos.y
             }
-
-            // move the items
-            it.p.x += it.v.x;
-            it.p.y += it.v.y;
-            if (it.p.x < 1) {
-                it.p.x = 1;
-                it.v.x *= -1;
-            }
-            if (it.p.x > this.W - 1) {
-                it.p.x = this.W - 1;
-                it.v.x *= -1;
-            }
-            if (it.p.y < 1) {
-                it.p.y = 1;
-                it.v.y *= -1;
-            }
-            if (it.p.y > this.H - 1) {
-                it.p.y = this.H - 1;
-                it.v.y *= -1;
-            }
-
-            if (it.age > 5000 && this.clock % 100 === 0 && randf(0, 1) < 0.1) {
-                it.cleanup_ = true; // replace this one, has been around too long
-                update_items = true;
-            }
-
         }
 
         for (var i = 0, n = this.agents.length; i < n; i++) {
             this.agents[i].totalReward += this.agents[i].digestion_signal;
-        }
-
-        if (update_items) {
-            var nt = [];
-            for (var i = 0, n = this.items.length; i < n; i++) {
-                var it = this.items[i];
-                if (!it.cleanup_) nt.push(it);
-            }
-            this.items = nt; // swap
         }
 
         // Add new items
@@ -474,7 +425,7 @@ const STATE_PER_EYE = 2;
 
 // Eye sensor has a maximum range and senses walls
 var Eye = function (angle) {
-    
+
 
     this.angle = angle; // angle relative to agent its on
     this.max_range = 120;
@@ -562,21 +513,8 @@ Agent.prototype = {
     backward: function () {
         var reward = this.digestion_signal;
 
-        // var proximity_reward = 0.0;
-        // var num_eyes = this.eyes.length;
-        // for(var i=0;i<num_eyes;i++) {
-        //   var e = this.eyes[i];
-        //   // agents dont like to see walls, especially up close
-        //   proximity_reward += e.sensed_type === 0 ? e.sensed_proximity/e.max_range : 1.0;
-        // }
-        // proximity_reward = proximity_reward/num_eyes;
-        // reward += proximity_reward;
-
-        //var forward_reward = 0.0;
-        //if(this.actionix === 0) forward_reward = 1;
-
         this.last_reward = reward; // for vis
         this.brain.learn(reward);
-        console.log("learn " + reward)
+        //console.log("learn " + reward)
     }
 };

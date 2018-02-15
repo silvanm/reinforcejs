@@ -2,7 +2,7 @@ var canvas, ctx;
 var agentView = false;
 var humanControls = false;
 
-const numAgents = 4;
+const numAgents = 5;
 
 let w;
 
@@ -25,7 +25,7 @@ function draw() {
     var agents = w.agents;
 
     // draw walls in environment
-    ctx.strokeStyle = "rgb(0,0,0)";
+    ctx.strokeStyle = "#ffffff";
     ctx.beginPath();
     for (var i = 0, n = w.walls.length; i < n; i++) {
         var q = w.walls[i];
@@ -248,7 +248,7 @@ function resetAgent() {
 }
 
 function loadAgent() {
-    $.getJSON("../agentzoo/wateragent.json", function (data) {
+    $.getJSON("agents/best.json", function (data) {
         var agent = w.agents[0].brain;
         agent.fromJSON(data); // corss your fingers...
         // set epsilon to be much lower for more optimal behavior
