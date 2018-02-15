@@ -6,9 +6,21 @@ const numAgents = 4;
 
 let w;
 
+var carImage = new Image();
+carImage.src = "img/car_normal.png";
+
+function rotateAndPaintImage ( context, image, angleInRad , positionX, positionY, axisX, axisY ) {
+  context.translate( positionX, positionY );
+  context.rotate( angleInRad );
+  context.drawImage( image, -axisX, -axisY );
+  context.rotate( -angleInRad );
+  context.translate( -positionX, -positionY );
+}
+
 // Draw everything
 function draw() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = "#000000";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.lineWidth = 1;
     var agents = w.agents;
 
@@ -32,17 +44,16 @@ function draw() {
 
         // draw agents body
         ctx.beginPath();
-        ctx.arc(a.op.x, a.op.y, a.rad, 0, Math.PI * 2, true);
-        ctx.fill();
-        ctx.stroke();
-        ctx.fillText(a.id, a.op.x, a.op.y);
+        // ctx.arc(a.op.x, a.op.y, a.rad, 0, Math.PI * 2, true);
+        // ctx.fill();
+        // ctx.stroke();
 
         // draw agents sight
         for (var ei = 0, ne = a.eyes.length; ei < ne; ei++) {
             var e = a.eyes[ei];
             var sr = e.sensed_proximity;
             if (e.sensed_type === -1) {
-                ctx.strokeStyle = "rgb(200,200,200)"; // wall or nothing
+                ctx.strokeStyle = "rgb(50,50,50)"; // wall or nothing
             }
             if (e.sensed_type === COLLISIONTYPE.WALL) {
                 ctx.strokeStyle = "rgb(0,200,0)"; // wall or nothing
@@ -62,6 +73,9 @@ function draw() {
                 a.op.y + sr * Math.cos(a.oangle + e.angle));
             ctx.stroke();
         }
+        // ctx.drawImage(carImage, a.op.x - 10, a.op.y - 10, 20, 20)
+        rotateAndPaintImage(ctx, carImage, a.angle, a.op.x, a.op.y, 20, 20)
+        ctx.fillText(a.id, a.op.x, a.op.y);
     }
 
     // draw items

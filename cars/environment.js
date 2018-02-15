@@ -282,39 +282,39 @@ World.prototype = {
             a.oangle = a.angle; // and angle
 
             // execute agent's desired action
-            var speed = 1;
-            if (a.action === 0) { // left
-                a.v.x += -speed;
+            var speed = 4;
+
+            console.log(a.action)
+            if (a.action === 1) { // brake
+                a.v += -speed;
+                if (a.v < 0)
+                    a.v = 0
             }
-            if (a.action === 1) { // right
-                a.v.x += speed;
+            if (a.action === 2) { // accelerate
+                a.v += speed;
             }
-            if (a.action === 2) { // up
-                a.v.y += -speed;
+            if (a.action === 3) { // up
+                a.angle += Math.PI / 20;
             }
-            if (a.action === 3) { // down
-                a.v.y += speed;
+            if (a.action === 4) { // down
+                a.angle -= Math.PI / 20;
             }
+            a.angle = a.angle % (2 * Math.PI) // overflow
 
             // forward the agent by velocity
-            a.v.x *= 0.95;
-            a.v.y *= 0.95;
-            a.p.x += a.v.x;
-            a.p.y += a.v.y;
+            a.v *= 0.95; // friction
 
-            // agent is trying to move from p to op. Check walls
-            //var res = this.stuff_collide_(a.op, a.p, true, false);
-            //if(res) {
-            // wall collision...
-            //}
+            // new position
+            a.p.x += a.v * Math.cos(a.angle);
+            a.p.y += a.v * Math.sin(a.angle);
 
             // handle boundary conditions.. bounce agent
-            if (a.p.x < 1) {
+            if (a.p.x < 1) { // hit to left wall
                 a.p.x = 1;
                 a.v.x = 0;
                 a.v.y = 0;
             }
-            if (a.p.x > this.W - 1) {
+            if (a.p.x > this.W - 1) { // hit right wall
                 a.p.x = this.W - 1;
                 a.v.x = 0;
                 a.v.y = 0;
@@ -365,15 +365,16 @@ World.prototype = {
         this.agents.forEach((agent) => {
             if (agent.p.x >= this.W - 1) {
                 agent.p.x = 0
+                agent.p.y = this.H / 2
                 agent.digestion_signal += 1 // reward for hitting the right wall
                 agent.wall++;
-                console.log("Hit the right wall")
+                //console.log("Hit the right wall")
             }
 
             if (agent.p.y <= 1 || agent.p.y >= this.H-1) {
-                agent.digestion_signal += -1 // reward for hitting any other walls
+                agent.digestion_signal += -0.2 // reward for hitting any other walls
                 agent.badwall++;
-                console.log("Hit the left, top or bottom wall")
+                //console.log("Hit the left, top or bottom wall")
             }
         })
 
@@ -488,19 +489,20 @@ var Agent = function (id) {
 
     this.id = id;
     // positional information
-    this.p = new Vec(300, 300);
-    this.v = new Vec(0, 0);
+    this.p = new Vec(0, 100);
+    this.v = 5;
     this.op = this.p; // old position
     this.angle = 0; // direction facing
 
     this.actions = [];
-    this.actions.push(0);
-    this.actions.push(1);
-    this.actions.push(2); // up
-    this.actions.push(3); // down
+    this.actions.push(0); // nothing
+    this.actions.push(1); // gas
+    this.actions.push(2); // brake
+    this.actions.push(3); // 30% to the right
+    this.actions.push(4); // 30% to the right
 
     // properties
-    this.rad = 10;
+    this.rad = 10; // radius
     this.eyes = [];
     for (var k = 0; k < 30; k++) {
         this.eyes.push(new Eye(k * 0.21));
@@ -547,8 +549,8 @@ Agent.prototype = {
             }
         }
         // proprioception and orientation
-        input_array[ne + 0] = this.v.x;
-        input_array[ne + 1] = this.v.y;
+        input_array[ne + 0] = this.v;
+        input_array[ne + 1] = this.angle / (2 * Math.PI);
         input_array[ne + 2] = this.p.x / w.W;
         input_array[ne + 3] = this.p.y / w.H;
 
