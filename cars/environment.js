@@ -114,6 +114,14 @@ var line_point_intersect = function (p1, p2, p0, rad) {
     return false;
 };
 
+var wall_angle = function(wallP1, wallP2) {
+    return Math.atan((wallP2.y - wallP1.y) / (wallP2.x - wallP1.x))
+}
+
+var rebound_angle = function (inboundAngle, wallP1, wallP2) {
+    return 2* Math.PI - inboundAngle + wall_angle(wallP1, wallP2)
+}
+
 // Wall is made up of two points
 var Wall = function (id, p1, p2, reward) {
     this.id = id;
@@ -143,8 +151,8 @@ var Item = function (x, y, type) {
 
 var World = function () {
     this.agents = [];
-    this.W = canvas.width;
-    this.H = canvas.height;
+    this.W = layer.width();
+    this.H = layer.height();
 
     this.clock = 0;
 
@@ -307,24 +315,24 @@ World.prototype = {
             var speed = 1;
 
             //console.log(a.action)
-            if (a.action === 1) { // brake
+           /* if (a.action === 1) { // brake
                 a.v += -speed;
-                if (a.v < 0)
-                    a.v = 0
+                if (a.v < 1)
+                    a.v = 1
             }
             if (a.action === 2) { // accelerate
                 a.v += speed;
-            }
-            if (a.action === 3) { // up
+            }*/
+            if (a.action === 1) { // up
                 a.angle += Math.PI / 20;
             }
-            if (a.action === 4) { // down
+            if (a.action === 2) { // down
                 a.angle -= Math.PI / 20;
             }
             a.angle = a.angle % (2 * Math.PI) // overflow
 
             // forward the agent by velocity
-            a.v *= 0.95; // friction
+            //a.v *= 0.95; // friction
 
             let plannedNewPos = new Vec(a.p.x + a.v * Math.cos(a.angle), a.p.y + a.v * Math.sin(a.angle));
 
@@ -336,57 +344,32 @@ World.prototype = {
 
             let wallCollisionData = false
             let wallCollisionId = null
+            let wallCollidedWith = null
             let collisionAngle = null
             this.walls.forEach((wall) => {
                 res = line_intersect(speedVector.p1, speedVector.p2, wall.p1, wall.p2)
                 if (res) {
                     wallCollisionId = wall.id
                     wallCollisionData = res
+                    wallCollidedWith = wall
                     collisionAngle = intersec_angle(speedVector.p1, speedVector.p2, wall.p1, wall.p2)
                 }
             })
 
             if (wallCollisionData) {
-
-
-                console.log(`Collision angle: ${collisionAngle / 6.28 * 360}`)
-
                 if (wallCollisionId === 'west bottom') {
                     a.digestion_signal = 1; // reward for hitting the right wall
                     a.wall++;
                     a.p.x = 0;
                     a.p.y = this.H / 4;
-                    a.v = 1
+                    //a.v = 5
                     a.angle = 0
-                    console.log(`Collision with wall ${wallCollisionId}`)
                 } else {
                     a.digestion_signal = -0.2 // reward for hitting a wall
-
-                    if (wallCollisionId === 'north') {
-                        a.angle = 0
-                        a.p.y = this.H / 10
-                    } else if (wallCollisionId === 'east') {
-                        a.angle = Math.PI * 0.5
-                        a.p.x = this.W * 0.9
-                    } else if (wallCollisionId === 'south') {
-                        a.angle = -Math.PI
-                        a.p.y = this.H * 0.9
-                    } else if (wallCollisionId === 'west top') {
-                        a.angle = 0
-                    } else if (wallCollisionId === 'middle') {
-                        if (a.p.y > this.H / 2) {
-                            // below middle line
-                            a.angle = -Math.PI
-                            a.p.y = this.H * 0.55
-                        } else {
-                            a.angle = 0
-                            a.p.y = this.H * 0.45
-                        }
-                    }
-
-
+                    let oldAngle = a.angle
+                    a.angle = rebound_angle(a.angle, wallCollidedWith.p1, wallCollidedWith.p2)
                     a.badwall++;
-                    console.log(`Collision with badwall ${wallCollisionId}`)
+                    //console.log(`Collision with badwall ${wallCollisionId}. Old angle: ${oldAngle}. New Angle: ${a.angle}`)
                 }
             } else {
                 // new position
@@ -440,17 +423,17 @@ var Agent = function (id) {
 
     this.id = id;
     // positional information
-    this.p = new Vec(0, 100);
+    this.p = new Vec(0, w.H/4);
     this.v = 5;
     this.op = this.p; // old position
     this.angle = 0; // direction facing
 
     this.actions = [];
     this.actions.push(0); // nothing
-    this.actions.push(1); // gas
-    this.actions.push(2); // brake
-    this.actions.push(3); // 30% to the right
-    this.actions.push(4); // 30% to the right
+    //this.actions.push(1); // gas
+    //this.actions.push(2); // brake
+    this.actions.push(1); // 30% to the right
+    this.actions.push(2); // 30% to the right
 
     // properties
     this.rad = 10; // radius

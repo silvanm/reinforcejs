@@ -2,83 +2,113 @@ var canvas, ctx;
 var agentView = false;
 var humanControls = false;
 
-const numAgents = 5;
+var DRAW_EYES = false;
 
-let w;
+const numAgents = 10;
+
+let layer; // the Konva layer
+
+let w; // the world
 
 var carImage = new Image();
-carImage.src = "img/car_normal.png";
+carImage.src = "img/bug.png";
 
-function rotateAndPaintImage ( context, image, angleInRad , positionX, positionY, axisX, axisY ) {
-  context.translate( positionX, positionY );
-  context.rotate( angleInRad );
-  context.drawImage( image, -axisX, -axisY );
-  context.rotate( -angleInRad );
-  context.translate( -positionX, -positionY );
+function rotateAndPaintImage(context, image, angleInRad, positionX, positionY, axisX, axisY, size) {
+    context.translate(positionX, positionY);
+    context.rotate(angleInRad);
+    context.drawImage(image, -axisX, -axisY, size, size);
+    context.rotate(-angleInRad);
+    context.translate(-positionX, -positionY);
 }
 
 // Draw everything
 function draw() {
-    ctx.fillStyle = "#000000";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.lineWidth = 1;
+//ctx.lineWidth = 2;
     var agents = w.agents;
 
     // draw walls in environment
-    ctx.strokeStyle = "#ffffff";
-    ctx.beginPath();
+    //ctx.strokeStyle = "black";
+    //ctx.beginPath();
+    layer.destroyChildren();
+
     for (var i = 0, n = w.walls.length; i < n; i++) {
         var q = w.walls[i];
-        ctx.moveTo(q.p1.x, q.p1.y);
-        ctx.lineTo(q.p2.x, q.p2.y);
+
+        var wall = new Konva.Line({
+            points: [q.p1.x, q.p1.y, q.p2.x, q.p2.y],
+            stroke: 'black',
+            strokeWidth: 2
+        });
+
+        layer.add(wall)
     }
-    ctx.stroke();
 
     // draw agents
     // color agent based on reward it is experiencing at the moment
     var r = 0;
-    ctx.fillStyle = "rgb(" + r + ", 150, 150)";
-    ctx.strokeStyle = "rgb(0,0,0)";
+
+    //ctx.fillStyle = "rgb(" + r + ", 150, 150)";
+    //ctx.strokeStyle = "rgb(0,0,0)";
     for (var i = 0, n = agents.length; i < n; i++) {
         var a = agents[i];
 
         // draw agents body
-        ctx.beginPath();
         // ctx.arc(a.op.x, a.op.y, a.rad, 0, Math.PI * 2, true);
         // ctx.fill();
         // ctx.stroke();
+        if (DRAW_EYES) {
 
-        // draw agents sight
-        for (var ei = 0, ne = a.eyes.length; ei < ne; ei++) {
-            var e = a.eyes[ei];
-            var sr = e.sensed_proximity;
-            if (e.sensed_type === -1) {
-                ctx.strokeStyle = "rgb(50,50,50)"; // wall or nothing
+            // draw agents sight
+            for (var ei = 0, ne = a.eyes.length; ei < ne; ei++) {
+                var e = a.eyes[ei];
+                var sr = e.sensed_proximity;
+                let color;
+                if (e.sensed_type === -1) {
+                    color = "rgb(50,50,50)"; // wall or nothing
+                }
+                if (e.sensed_type === COLLISIONTYPE.WALL) {
+                    color = "rgb(0,200,0)"; // wall or nothing
+                }
+                if (e.sensed_type === COLLISIONTYPE.BADWALL) {
+                    color = "rgb(55,10,10)";
+                } // apples
+                if (e.sensed_type === COLLISIONTYPE.POISON) {
+                    color = "rgb(150,255,150)";
+                } // poison
+                if (e.sensed_type === COLLISIONTYPE.AGENT) {
+                    color = "rgb(0,0,255)";
+                } // agent
+
+                layer.add(new Konva.Line({
+                    points: [a.op.x, a.op.y, a.op.x + sr * Math.sin(a.oangle + e.angle),
+                    a.op.y + sr * Math.cos(a.oangle + e.angle)],
+                    stroke: color,
+                    strokeWidth: 1
+                }))
             }
-            if (e.sensed_type === COLLISIONTYPE.WALL) {
-                ctx.strokeStyle = "rgb(0,200,0)"; // wall or nothing
-            }
-            if (e.sensed_type === COLLISIONTYPE.BADWALL) {
-                ctx.strokeStyle = "rgb(255,150,150)";
-            } // apples
-            if (e.sensed_type === COLLISIONTYPE.POISON) {
-                ctx.strokeStyle = "rgb(150,255,150)";
-            } // poison
-            if (e.sensed_type === COLLISIONTYPE.AGENT) {
-                ctx.strokeStyle = "rgb(0,0,255)";
-            } // agent
-            ctx.beginPath();
-            ctx.moveTo(a.op.x, a.op.y);
-            ctx.lineTo(a.op.x + sr * Math.sin(a.oangle + e.angle),
-                a.op.y + sr * Math.cos(a.oangle + e.angle));
-            ctx.stroke();
         }
         // ctx.drawImage(carImage, a.op.x - 10, a.op.y - 10, 20, 20)
-        rotateAndPaintImage(ctx, carImage, a.angle, a.op.x, a.op.y, 20, 20)
-        ctx.fillText(a.id, a.op.x, a.op.y);
+        layer.add(new Konva.Image({
+            'image': carImage,
+            'rotation': a.angle / 2 / Math.PI * 360,
+            'x': a.op.x,
+            'y': a.op.y,
+            'offsetX': 10,
+            'offsetY': 10
+            })
+        )
+        layer.add(new Konva.Text({
+            'text': a.id,
+            'fontSize': 17,
+            'x': a.op.x,
+            'y': a.op.y,
+            'offsetX': 20,
+            'offsetY': 20
+        }))
     }
 
     // draw items
+    /*
     ctx.strokeStyle = "rgb(0,0,0)";
     if (!agentView) {
         for (var i = 0, n = w.items.length; i < n; i++) {
@@ -90,7 +120,9 @@ function draw() {
             ctx.fill();
             ctx.stroke();
         }
-    }
+    }*/
+
+    layer.draw()
 }
 
 // Tick the world
@@ -241,6 +273,17 @@ function saveAgent() {
     $("#mysterybox").val(JSON.stringify(brain.toJSON()));
 }
 
+function saveAgents() {
+    w.agents.forEach((agent) => {
+        $.ajax({
+            type: 'POST',
+            url: `http://localhost:5000/braindump/${agent.id}`,
+            data: JSON.stringify(agent.brain.toJSON()),
+            contentType: 'application/json'
+        })
+    })
+}
+
 function resetAgent() {
     eval($("#agentspec").val());
     var brain = new RL.DQNAgent(env, spec);
@@ -307,9 +350,16 @@ function enableHuman() {
 }
 
 function start() {
-    canvas = document.getElementById("canvas");
-    ctx = canvas.getContext("2d");
-    ctx.font = "30px Arial";
+
+    let stage = new Konva.Stage({
+        container: 'container',   // id of container <div>
+        width: 700,
+        height: 400
+    });
+
+    layer = new Konva.Layer();
+    layer.clearBeforeDraw(true)
+    stage.add(layer);
 
     eval($("#agentspec").val());
 
@@ -348,7 +398,7 @@ function updateStats() {
     for (var i = 0; i < w.agents.length; i++) {
         stats += "<li>Player " + w.agents[i].id + ": " + w.agents[i].wall + " wall, ";
         stats += w.agents[i].badwall + " badwall, " + w.agents[i].agents + " agents, " +
-             w.agents[i].totalReward + " total</li>";
+            w.agents[i].totalReward + " total</li>";
     }
     stats += `Clock: ${w.clock}`;
     stats += "</ul>";
