@@ -5,9 +5,9 @@ const COLLISIONTYPE = {
     AGENT: 3
 }
 
-const POISON_ENABLED = true;
+const BOMBS_ENABLED = false;
 
-const NUMITEMS = 0;
+const NUMITEMS = 3;
 
 const REWARD = {
     AGENT: 0,
@@ -15,15 +15,21 @@ const REWARD = {
     POISON: -1,
 }
 
-const NEW_ITEM_PROBABILTY = 0.7;
+const NEW_ITEM_PROBABILTY = 0.1;
 
-let addNewItems = false;
+const STATE_PER_EYE = BOMBS_ENABLED ? 3 : 2;
+
+let addNewItems = true;
 
 var randf = function (lo, hi) {
     return Math.random() * (hi - lo) + lo;
 };
 var randi = function (lo, hi) {
     return Math.floor(randf(lo, hi));
+};
+
+Math.degrees = function(radians) {
+  return radians * 180 / Math.PI;
 };
 
 // A 2D vector utility
@@ -119,30 +125,31 @@ var wall_angle = function(wallP1, wallP2) {
 }
 
 var rebound_angle = function (inboundAngle, wallP1, wallP2) {
-    return 2* Math.PI - inboundAngle + wall_angle(wallP1, wallP2)
+    return (2* Math.PI - inboundAngle - 2 * wall_angle(wallP1, wallP2)) % (2 * Math.PI)
 }
 
 // Wall is made up of two points
-var Wall = function (id, p1, p2, reward) {
+var Wall = function (id, p1, p2, reward, draw) {
     this.id = id;
     this.p1 = p1;
     this.p2 = p2;
     this.reward = reward;
+    this.draw = draw
 };
 
 var util_add_box = function (lst, x, y, w, h) {
-    lst.push(new Wall('north', new Vec(x, y), new Vec(x + w, y), -1)); // north
-    lst.push(new Wall('east', new Vec(x + w, y), new Vec(x + w, y + h), -1)); // east
-    lst.push(new Wall('south', new Vec(x + w, y + h), new Vec(x, y + h), -1)); // south
-    lst.push(new Wall('west top', new Vec(x, y + h / 2), new Vec(x, y), -1)); // west bottom
-    lst.push(new Wall('west bottom', new Vec(x, y + h), new Vec(x, y + h / 2), 1)); // west top
-    lst.push(new Wall('middle', new Vec(x, y + h / 2), new Vec(x + w * 0.7, y + h / 2), -1));
+    lst.push(new Wall('north', new Vec(x, y), new Vec(x + w, y), -1, true)); // north
+    lst.push(new Wall('east', new Vec(x + w, y), new Vec(x + w, y + h), -1, true)); // east
+    lst.push(new Wall('south', new Vec(x + w, y + h), new Vec(x, y + h), -1, true)); // south
+    lst.push(new Wall('west top', new Vec(x, y + h / 2), new Vec(x, y), -1, true));
+    lst.push(new Wall('west bottom', new Vec(x, y + h), new Vec(x, y + h / 2), 1, false));
+    lst.push(new Wall('middle', new Vec(x, y + h / 2), new Vec(x + w * 0.7, y + h / 2), -1, true));
 };
 
 // item is circle thing on the floor that agent can interact with (see or eat, etc)
 var Item = function (x, y, type) {
     this.p = new Vec(x, y); // position
-    this.v = new Vec(Math.random() * 2 - 2.5, Math.random() * 2 - 2.5);
+    this.v = new Vec(0 ,0);
     this.type = type;
     this.rad = 10; // default radius
     this.age = 0;
@@ -151,8 +158,8 @@ var Item = function (x, y, type) {
 
 var World = function () {
     this.agents = [];
-    this.W = layer.width();
-    this.H = layer.height();
+    this.W = canvas.width;
+    this.H = canvas.height;
 
     this.clock = 0;
 
@@ -163,16 +170,15 @@ var World = function () {
 
     // set up food and poison
     this.items = [];
-    for (var k = 0; k < NUMITEMS; k++) {
-        var x = randf(20, this.W - 20);
-        var y = randf(20, this.H - 20);
+    if (BOMBS_ENABLED) {
+        for (var k = 0; k < NUMITEMS; k++) {
+            var x = randf(20, this.W - 20);
+            var y = randf(20, this.H - 20);
 
-        if (POISON_ENABLED)
-            var t = randi(1, 3); // food or poison (1 and 2)
-        else
-            var t = COLLISIONTYPE.APPLE;
-        var it = new Item(x, y, t);
-        this.items.push(it);
+            var t = COLLISIONTYPE.POISON;
+            var it = new Item(x, y, t);
+            this.items.push(it);
+        }
     }
 };
 
@@ -305,6 +311,8 @@ World.prototype = {
             this.agents[i].forward();
         }
 
+        let update_items = false
+
         // apply outputs of agents on evironment
         for (var i = 0, n = this.agents.length; i < n; i++) {
             var a = this.agents[i];
@@ -312,7 +320,7 @@ World.prototype = {
             a.oangle = a.angle; // and angle
 
             // execute agent's desired action
-            var speed = 1;
+            var speed = 2;
 
             //console.log(a.action)
            /* if (a.action === 1) { // brake
@@ -360,21 +368,57 @@ World.prototype = {
                 if (wallCollisionId === 'west bottom') {
                     a.digestion_signal = 1; // reward for hitting the right wall
                     a.wall++;
+                    a.visCollisionInfo = { 'pos': new Vec(a.p.x, a.p.y) , 'type': COLLISIONTYPE.WALL }
                     a.p.x = 0;
                     a.p.y = this.H / 4;
-                    //a.v = 5
+                    a.v = 5
                     a.angle = 0
                 } else {
                     a.digestion_signal = -0.2 // reward for hitting a wall
                     let oldAngle = a.angle
                     a.angle = rebound_angle(a.angle, wallCollidedWith.p1, wallCollidedWith.p2)
                     a.badwall++;
-                    //console.log(`Collision with badwall ${wallCollisionId}. Old angle: ${oldAngle}. New Angle: ${a.angle}`)
+                    a.visCollisionInfo = { 'pos': a.p, 'type': COLLISIONTYPE.BADWALL }
+                 //   console.log(`Collision with badwall ${wallCollisionId}. Old angle: ${Math.degrees(oldAngle)}. New Angle: ${Math.degrees(a.angle)}`)
                 }
             } else {
-                // new position
-                a.p.x = plannedNewPos.x
-                a.p.y = plannedNewPos.y
+
+                let collisionWithItem = false;
+                // Check collision with bomb
+                for (var itemIx = 0; itemIx < this.items.length; itemIx++) {
+                    var it = this.items[itemIx];
+
+                    var d = a.p.dist_from(it.p);
+                    if (d < it.rad + a.rad) {
+
+                        if (it.type === 1) {
+                            a.digestion_signal += REWARD.APPLE; // mmm delicious apple
+                            a.apples++;
+                            a.visCollisionInfo = { 'pos': new Vec(a.p.x, a.p.y) , 'type': COLLISIONTYPE.APPLE }
+                            collisionWithItem = true;
+                        }
+                        if (it.type === 2) {
+                            a.digestion_signal += REWARD.POISON; // ewww poison
+                            a.poison++;
+                            a.visCollisionInfo = { 'pos': new Vec(a.p.x, a.p.y) , 'type': COLLISIONTYPE.POISON }
+                            collisionWithItem = true;
+                        }
+
+                        if (collisionWithItem) {
+                            it.cleanup_ = true;
+                            update_items = true;
+                        }
+                    }
+                }
+
+                if (collisionWithItem) {
+                    // In case of an item collision the angle is just inverted
+                    a.angle = (Math.PI - a.angle) % (2 * Math.PI)
+                    a.p = new Vec(a.p.x + a.v * Math.cos(a.angle), a.p.y + a.v * Math.sin(a.angle));
+                } else {
+                    a.p.x = plannedNewPos.x
+                    a.p.y = plannedNewPos.y
+                }
             }
         }
 
@@ -382,16 +426,22 @@ World.prototype = {
             this.agents[i].totalReward += this.agents[i].digestion_signal;
         }
 
+        if (update_items) {
+            var nt = [];
+            for (var i = 0, n = this.items.length; i < n; i++) {
+                var it = this.items[i];
+                if (!it.cleanup_) nt.push(it);
+            }
+            this.items = nt; // swap
+        }
+
         // Add new items
-        if (addNewItems) {
+        if (addNewItems && BOMBS_ENABLED) {
             if (this.items.length < 50 && this.clock % 10 === 0 && randf(0, 1) < NEW_ITEM_PROBABILTY) {
-                var newitx = randf(20, this.W - 20);
+                var newitx = randf(50, this.W - 20);
                 var newity = randf(20, this.H - 20);
 
-                if (POISON_ENABLED)
-                    var newitt = randi(1, 3); // food or poison (1 and 2)
-                else
-                    var newitt = COLLISIONTYPE.APPLE;
+                var newitt = COLLISIONTYPE.POISON;
                 var newit = new Item(newitx, newity, newitt);
                 this.items.push(newit);
             }
@@ -403,8 +453,6 @@ World.prototype = {
         }
     }
 };
-
-const STATE_PER_EYE = 2;
 
 // Eye sensor has a maximum range and senses walls
 var Eye = function (angle) {
@@ -420,6 +468,8 @@ var Eye = function (angle) {
 
 // A single agent
 var Agent = function (id) {
+
+    this.visCollisionInfo = null
 
     this.id = id;
     // positional information
@@ -450,6 +500,7 @@ var Agent = function (id) {
     this.wall = 0;
     this.badwall = 0;
     this.agents = 0;
+    this.poison = 0;
 
     this.totalReward = 0;
 
@@ -476,6 +527,10 @@ Agent.prototype = {
             var e = this.eyes[i];
             input_array[i * STATE_PER_EYE] = 1.0; // wall
             input_array[i * STATE_PER_EYE + 1] = 1.0; // bad wall
+
+            if (BOMBS_ENABLED) {
+                input_array[i * STATE_PER_EYE + 2] = 1.0; // poison
+            }
             if (e.sensed_type !== -1) {
                 // sensed_type is 0 for wall, 1 for bad wall
                 // lets do a 1-of-k encoding into the input array

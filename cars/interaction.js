@@ -6,12 +6,22 @@ var DRAW_EYES = false;
 
 const numAgents = 10;
 
-let layer; // the Konva layer
-
-let w; // the world
+let w;
 
 var carImage = new Image();
 carImage.src = "img/bug.png";
+
+let explosionImage = new Image()
+explosionImage.src = "img/explosion.png"
+
+let starImage = new Image()
+starImage.src = "img/star.png"
+
+let bombImage = new Image()
+bombImage.src = "img/bomb.png"
+
+let finishImage = new Image()
+finishImage.src = "img/finish.png"
 
 function rotateAndPaintImage(context, image, angleInRad, positionX, positionY, axisX, axisY, size) {
     context.translate(positionX, positionY);
@@ -21,108 +31,131 @@ function rotateAndPaintImage(context, image, angleInRad, positionX, positionY, a
     context.translate(-positionX, -positionY);
 }
 
+let starAnimQueue = []
+
 // Draw everything
 function draw() {
-//ctx.lineWidth = 2;
+    ctx.fillStyle = "white";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.lineWidth = 5;
     var agents = w.agents;
 
     // draw walls in environment
-    //ctx.strokeStyle = "black";
-    //ctx.beginPath();
-    layer.destroyChildren();
-
+    ctx.strokeStyle = "gray";
+    ctx.beginPath();
     for (var i = 0, n = w.walls.length; i < n; i++) {
         var q = w.walls[i];
 
-        var wall = new Konva.Line({
-            points: [q.p1.x, q.p1.y, q.p2.x, q.p2.y],
-            stroke: 'black',
-            strokeWidth: 2
-        });
-
-        layer.add(wall)
+        if (q.draw) {
+            ctx.moveTo(q.p1.x, q.p1.y);
+            ctx.lineTo(q.p2.x, q.p2.y);
+        }
     }
+    ctx.stroke();
 
     // draw agents
     // color agent based on reward it is experiencing at the moment
     var r = 0;
 
-    //ctx.fillStyle = "rgb(" + r + ", 150, 150)";
-    //ctx.strokeStyle = "rgb(0,0,0)";
+    ctx.fillStyle = "#999999";
+    ctx.strokeStyle = "rgb(0,0,0)";
     for (var i = 0, n = agents.length; i < n; i++) {
         var a = agents[i];
 
         // draw agents body
+        ctx.beginPath();
         // ctx.arc(a.op.x, a.op.y, a.rad, 0, Math.PI * 2, true);
         // ctx.fill();
         // ctx.stroke();
         if (DRAW_EYES) {
 
+            ctx.lineWidth = 1;
             // draw agents sight
             for (var ei = 0, ne = a.eyes.length; ei < ne; ei++) {
                 var e = a.eyes[ei];
                 var sr = e.sensed_proximity;
-                let color;
                 if (e.sensed_type === -1) {
-                    color = "rgb(50,50,50)"; // wall or nothing
+                    ctx.strokeStyle = "rgb(200,200,200)"; // wall or nothing
                 }
                 if (e.sensed_type === COLLISIONTYPE.WALL) {
-                    color = "rgb(0,200,0)"; // wall or nothing
+                    ctx.strokeStyle = "rgb(0,200,0)"; // wall or nothing
                 }
                 if (e.sensed_type === COLLISIONTYPE.BADWALL) {
-                    color = "rgb(55,10,10)";
+                    ctx.strokeStyle = "rgb(255,210,210)";
                 } // apples
                 if (e.sensed_type === COLLISIONTYPE.POISON) {
-                    color = "rgb(150,255,150)";
+                    ctx.strokeStyle = "rgb(50, 0, 50)";
                 } // poison
                 if (e.sensed_type === COLLISIONTYPE.AGENT) {
-                    color = "rgb(0,0,255)";
+                    ctx.strokeStyle = "rgb(0,0,255)";
                 } // agent
-
-                layer.add(new Konva.Line({
-                    points: [a.op.x, a.op.y, a.op.x + sr * Math.sin(a.oangle + e.angle),
-                    a.op.y + sr * Math.cos(a.oangle + e.angle)],
-                    stroke: color,
-                    strokeWidth: 1
-                }))
+                ctx.beginPath();
+                ctx.moveTo(a.op.x, a.op.y);
+                ctx.lineTo(a.op.x + sr * Math.sin(a.oangle + e.angle),
+                    a.op.y + sr * Math.cos(a.oangle + e.angle));
+                ctx.stroke();
             }
         }
         // ctx.drawImage(carImage, a.op.x - 10, a.op.y - 10, 20, 20)
-        layer.add(new Konva.Image({
-            'image': carImage,
-            'rotation': a.angle / 2 / Math.PI * 360,
-            'x': a.op.x,
-            'y': a.op.y,
-            'offsetX': 10,
-            'offsetY': 10
-            })
-        )
-        layer.add(new Konva.Text({
-            'text': a.id,
-            'fontSize': 17,
-            'x': a.op.x,
-            'y': a.op.y,
-            'offsetX': 20,
-            'offsetY': 20
-        }))
+        rotateAndPaintImage(ctx, carImage, a.angle, a.op.x, a.op.y, 10, 10, 25)
+        ctx.font = "15px -apple-system,Sans-Serif";
+        ctx.fillText(a.id, a.op.x + 15, a.op.y);
+        ctx.fillText((a.totalReward * 5 + 1000).toFixed(0), a.op.x + 15, a.op.y + 15);
+
+        if (a.visCollisionInfo !== null) {
+            if ([COLLISIONTYPE.BADWALL, COLLISIONTYPE.POISON].indexOf(a.visCollisionInfo.type) >= 0) {
+                ctx.drawImage(explosionImage, a.visCollisionInfo.pos.x - 20, a.visCollisionInfo.pos.y - 20);
+                starAnimQueue.push({
+                    'pos': a.visCollisionInfo.pos,
+                    'ticks': 10,
+                    'type': 'badwall'
+                })
+                a.visCollisionInfo = null
+            } else if (a.visCollisionInfo.type === COLLISIONTYPE.WALL) {
+                starAnimQueue.push({
+                    'pos': a.visCollisionInfo.pos,
+                    'ticks': 20,
+                    'type': 'wall'
+                })
+                a.visCollisionInfo = null
+            }
+        }
     }
 
-    // draw items
-    /*
-    ctx.strokeStyle = "rgb(0,0,0)";
-    if (!agentView) {
-        for (var i = 0, n = w.items.length; i < n; i++) {
-            var it = w.items[i];
-            if (it.type === 1) ctx.fillStyle = "rgb(255, 150, 150)";
-            if (it.type === 2) ctx.fillStyle = "rgb(150, 255, 150)";
-            ctx.beginPath();
-            ctx.arc(it.p.x, it.p.y, it.rad, 0, Math.PI * 2, true);
-            ctx.fill();
-            ctx.stroke();
-        }
-    }*/
+    // draw finish
+    ctx.drawImage(finishImage, 10, w.H / 2, 20, w.H / 2);
 
-    layer.draw()
+    // Animation for the stars at the goal
+    starAnimQueue.forEach((star) => {
+        if (star.ticks > 0) {
+            //ctx.drawImage(starImage, star.pos.x - 20, star.pos.y - 20 - size, starImage.width, starImage.height, 0, 0, size, size);
+            if (star.type === 'badwall') {
+                //ctx.drawImage(starImage, star.pos.x, star.pos.y - 20, size, size);
+                let size = (10 - star.ticks) * 4
+                ctx.fillStyle = "#000000";
+                ctx.font = "20px -apple-system,Sans-Serif";
+                ctx.fillText("-1", star.pos.x + size, star.pos.y);
+            } else {
+                let size = (20 - star.ticks) * 4
+                ctx.fillStyle = "#ffbe06";
+                ctx.font = "30px -apple-system,Sans-Serif";
+                ctx.fillText("+5", star.pos.x + size, star.pos.y);
+            }
+            star.ticks--
+        }
+    })
+
+    // draw items
+
+    ctx.strokeWidth = 2
+    ctx.strokeStyle = "rgb(0,0,0)";
+    for (var i = 0, n = w.items.length; i < n; i++) {
+        var it = w.items[i];
+        if (it.type === 2) ctx.fillStyle = "rgb(255, 150, 150)";
+        if (it.type === 1) ctx.fillStyle = "rgb(150, 255, 150)";
+        ctx.drawImage(bombImage, it.p.x - 20, it.p.y - 20);
+    }
+
 }
 
 // Tick the world
@@ -286,18 +319,24 @@ function saveAgents() {
 
 function resetAgent() {
     eval($("#agentspec").val());
-    var brain = new RL.DQNAgent(env, spec);
-    w.agents[0].brain = brain;
+
+    w.agents.forEach((agent) => {
+        var brain = new RL.DQNAgent(env, spec);
+        agent.brain = brain;
+    })
 }
 
 function loadAgent() {
     $.getJSON("agents/best.json", function (data) {
-        var agent = w.agents[0].brain;
-        agent.fromJSON(data); // corss your fingers...
-        // set epsilon to be much lower for more optimal behavior
-        agent.epsilon = 0.05;
-        $("#slider").slider('value', agent.epsilon);
-        $("#eps").html(agent.epsilon.toFixed(2));
+
+        let newEpsilon = 0.05
+        w.agents.forEach((agent) => {
+            agent.brain.fromJSON(data); // corss your fingers...
+            agent.epsilon = newEpsilon;
+        })
+
+        $("#slider").slider('value', newEpsilon);
+        $("#eps").html(newEpsilon);
         // kill learning rate to not learn
         agent.alpha = 0;
     });
@@ -306,28 +345,6 @@ function loadAgent() {
 function toggleAgentView() {
     agentView = !agentView;
 }
-
-var lastKey = null;
-document.onkeydown = function (e) {
-    var event = window.event ? window.event : e;
-    lastKey = event.keyCode;
-    if (lastKey == 37 || lastKey == 38 || lastKey == 39 || lastKey == 40) {
-        enableHuman();
-        e.preventDefault();
-        if (lastKey == 37) {
-            humanAction = 0;
-        }
-        if (lastKey == 39) {
-            humanAction = 1;
-        }
-        if (lastKey == 38) {
-            humanAction = 2;
-        }
-        if (lastKey == 40) {
-            humanAction = 3;
-        }
-    }
-};
 
 var humanAction = -1;
 
@@ -350,16 +367,9 @@ function enableHuman() {
 }
 
 function start() {
-
-    let stage = new Konva.Stage({
-        container: 'container',   // id of container <div>
-        width: 700,
-        height: 400
-    });
-
-    layer = new Konva.Layer();
-    layer.clearBeforeDraw(true)
-    stage.add(layer);
+    canvas = document.getElementById("canvas");
+    ctx = canvas.getContext("2d");
+    ctx.font = "15px -apple-system,Sans-Serif";
 
     eval($("#agentspec").val());
 
@@ -397,10 +407,14 @@ function updateStats() {
     ``
     for (var i = 0; i < w.agents.length; i++) {
         stats += "<li>Player " + w.agents[i].id + ": " + w.agents[i].wall + " wall, ";
-        stats += w.agents[i].badwall + " badwall, " + w.agents[i].agents + " agents, " +
-            w.agents[i].totalReward + " total</li>";
+        stats += w.agents[i].badwall + " badwall, " + w.agents[i].poison + " bombs, " +
+            w.agents[i].totalReward.toFixed(1) + " total</li>";
     }
     stats += `Clock: ${w.clock}`;
     stats += "</ul>";
     $("#apples_and_poison").html(stats);
+}
+
+function showAdvanced() {
+    $('body').toggleClass('debug')
 }

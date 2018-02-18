@@ -47,7 +47,12 @@ describe("AI Testsuite", function () {
         p2 = new Vec(-1, 1);
         expect(wall_angle(p1, p2)).toBe(0);
 
-        // -45%
+        // 90°
+        p1 = new Vec(0, 0);
+        p2 = new Vec(0, 1);
+        expect(wall_angle(p1, p2)).toBe(Math.PI / 2);
+
+        // -45°
         p1 = new Vec(0, 0);
         p2 = new Vec(-1, 1);
         expect(wall_angle(p1, p2)).toBe(-Math.PI / 4);
@@ -77,6 +82,12 @@ describe("AI Testsuite", function () {
         wallP2 = new Vec(2, 1);
 
         expect(rebound_angle(Math.PI / 4, wallP1, wallP2)).toBeCloseTo(Math.PI * 1.75, 2);
+    });
+
+    it("wall rebound (0° in, wall 90°)", function () {
+        wallP1 = new Vec(0, 0); // 90° wall
+        wallP2 = new Vec(0, 1);
+        expect(rebound_angle(0, wallP1, wallP2)).toBeCloseTo(Math.PI, 2);
     });
 
 });
