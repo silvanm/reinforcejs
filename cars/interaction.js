@@ -4,9 +4,14 @@ var humanControls = false;
 
 var DRAW_EYES = false;
 
+var DEBUG = false;
+
 const numAgents = 10;
 
 let w;
+
+var bugWithStarImage = new Image();
+bugWithStarImage.src = "img/bug-with-star.png";
 
 var carImage = new Image();
 carImage.src = "img/bug.png";
@@ -59,6 +64,15 @@ function draw() {
 
     ctx.fillStyle = "#999999";
     ctx.strokeStyle = "rgb(0,0,0)";
+    let maxReward = -1000;
+    let leader = null;
+    agents.forEach((agent) => {
+        if (agent.totalReward > maxReward) {
+            leader = agent;
+            maxReward = agent.totalReward
+        }
+    })
+
     for (var i = 0, n = agents.length; i < n; i++) {
         var a = agents[i];
 
@@ -67,7 +81,7 @@ function draw() {
         // ctx.arc(a.op.x, a.op.y, a.rad, 0, Math.PI * 2, true);
         // ctx.fill();
         // ctx.stroke();
-        if (DRAW_EYES) {
+        if (DRAW_EYES || DEBUG) {
 
             ctx.lineWidth = 1;
             // draw agents sight
@@ -97,9 +111,11 @@ function draw() {
             }
         }
         // ctx.drawImage(carImage, a.op.x - 10, a.op.y - 10, 20, 20)
-        rotateAndPaintImage(ctx, carImage, a.angle, a.op.x, a.op.y, 10, 10, 25)
+        rotateAndPaintImage(ctx, a === leader ? bugWithStarImage : carImage, a.angle, a.op.x, a.op.y, 10, 10, 25)
         ctx.font = "15px -apple-system,Sans-Serif";
-        ctx.fillText(a.id, a.op.x + 15, a.op.y);
+
+        if (DEBUG)
+            ctx.fillText(a.id, a.op.x + 15, a.op.y);
         ctx.fillText((a.totalReward * 5 + 1000).toFixed(0), a.op.x + 15, a.op.y + 15);
 
         if (a.visCollisionInfo !== null) {
@@ -338,12 +354,8 @@ function loadAgent() {
         $("#slider").slider('value', newEpsilon);
         $("#eps").html(newEpsilon);
         // kill learning rate to not learn
-        agent.alpha = 0;
+        //agent.alpha = 0;
     });
-}
-
-function toggleAgentView() {
-    agentView = !agentView;
 }
 
 var humanAction = -1;
@@ -417,4 +429,5 @@ function updateStats() {
 
 function showAdvanced() {
     $('body').toggleClass('debug')
+    DEBUG = !DEBUG;
 }

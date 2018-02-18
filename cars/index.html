@@ -73,15 +73,15 @@
     <h1 style="margin-top: 1rem">You have a neural network in your browser</h1>
 
     <p>Below you can see a simple game: Each of the ladybirds starts with 1000 points. It crawls from the top left and has to move to the finish on the bottom left.
-        If it finishes, he wins 5 points. If it runs into a wall, it loses 1 point. The small numbers next to the icon show the id
-    and the current score.</p>
+        If it finishes, he wins 5 points. If it runs into a wall, it loses 1 point. The small numbers next to the icon show the current score. The best beetle
+    has a star on his back.</p>
 
 <p>Each of the ladybirds has a neural network of 400 neurons. At the beginning it is stupid : It runs in a circle or
     runs into the walls. After a few hours - he learns what to do thanks to the set incentives.
     The surprising thing is that I am not giving instructions such as <em>"If you're at the right edge, turn down and run down again
-        to the left"</em>. I provide him information about his location, 2 moves (turn left and turn right) and the rewards. The rest he learns by himself!</p>
+        to the left"</em>. I provide it information about his location, 2 moves (turn left and turn right) and the rewards. The rest it learns by himself!</p>
 
-<p>If you have no patience to keep the same browser window open for several hours, you can load an already trained beetles.
+<p>If you have no patience to keep the same browser window open for several hours, you can load an already trained brains (!).
     Click on "Load trained beetle". You'll immediately notice them moving in a smarter way. Note: Those bugs are still quite dumb. At least they don't run in circles anymore. And
 they don't run into the walls all the time. - A full-time AI specialist could certainly tune the learning algorithm and the so-called
 hyperparameters to make them smarter 🤓</p>
@@ -117,7 +117,7 @@ spec.num_hidden_units = 400 // number of neurons in hidden layer
             normal
         </button>
     <button class="btn btn-primary" onclick="loadAgent()"
-    >Load trained beetles
+    >Load trained brains
     </button>
         <button class="btn btn-info" onclick="showAdvanced()" >Advanced info
         </button>
