@@ -349,6 +349,7 @@ function loadAgent() {
         w.agents.forEach((agent) => {
             agent.brain.fromJSON(data); // corss your fingers...
             agent.epsilon = newEpsilon;
+            agent.alpha = 0;
         })
 
         $("#slider").slider('value', newEpsilon);
