@@ -251,13 +251,16 @@ function initFlot() {
                 left: 10
             }
         },
+        legend: {
+            show: true
+        },
         xaxis: {
             min: 0,
             max: nflot
         },
         yaxis: {
-            min: -0.1,
-            max: 0.1
+            min: -0.05,
+            max: 0.05
         }
     });
     setInterval(function () {
@@ -419,8 +422,8 @@ function updateStats() {
     var stats = "<ul>";
     ``
     for (var i = 0; i < w.agents.length; i++) {
-        stats += "<li>Player " + w.agents[i].id + ": " + w.agents[i].wall + " wall, ";
-        stats += w.agents[i].badwall + " badwall, " + w.agents[i].poison + " bombs, " +
+        stats += "<li>Player " + w.agents[i].id + ": " + w.agents[i].wall + " finish, ";
+        stats += w.agents[i].badwall + " wall, " + w.agents[i].poison + " bombs, " +
             w.agents[i].totalReward.toFixed(1) + " total</li>";
     }
     stats += `Clock: ${w.clock}`;

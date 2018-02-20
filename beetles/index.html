@@ -49,9 +49,6 @@
             display: block;
         }
 
-        h2 {
-            text-align: center;
-        }
 
         canvas {
             border: 1px solid black;
@@ -72,17 +69,21 @@
 
     <h1 style="margin-top: 1rem">You have a neural network in your browser</h1>
 
-    <p>Below you can see a simple game: Each of the ladybirds starts with 1000 points. It crawls from the top left and has to move to the finish on the bottom left.
-        If it finishes, he wins 5 points. If it runs into a wall, it loses 1 point. The small numbers next to the icon show the current score. The best beetle
-    has a star on his back.</p>
+    <p>Below you can see a simple game: Ten beetle on a racetrack 🏎. Each of the ladybirds starts with 1000 points. It crawls from the top left and has to move to the finish on the bottom left.
+        If it finishes, he wins 5 points and is placed again at the start line. If it runs into a wall, it loses 1 point. The small numbers next to the icon show the current score. The best beetle
+    is marked with a star.</p>
 
-<p>Each of the ladybirds has a neural network of 400 neurons. At the beginning it is stupid : It runs in a circle or
-    runs into the walls. After a few hours - he learns what to do thanks to the set incentives.
+        <h3>Each of the ladybirds has a brain of 200 neurons</h3>
+<p>At the beginning they are plain stupid: They run in a circle or
+    hit the walls 🤕. After about 15 minutes (depending on your computer's speed) it learns what to do thanks to the set incentives. It will try to avoid
+    running into walls (because this causes a penalty of one point). And it will try to reach the finish line.
     The surprising thing is that I am not giving instructions such as <em>"If you're at the right edge, turn down and run down again
-        to the left"</em>. I provide it information about his location, 2 moves (turn left and turn right) and the rewards. The rest it learns by himself!</p>
+        to the left"</em>. All I provide is the rewards, the information about his location, and the option to use 2 actions - turn left and turn right.
+    The rest it learns by himself!</p>
 
-<p>If you have no patience to keep the same browser window open for several hours, you can load an already trained brains (!).
-    Click on "Load trained beetle". You'll immediately notice them moving in a smarter way. Note: Those bugs are still quite dumb. At least they don't run in circles anymore. And
+    <h3>Load a trained brain</h3>
+<p>If you have no patience to keep the same browser window open for several hours, you can load an already trained brains.
+    Click on "Load trained brains". Then the brain of one beetle which was particularly smart is being injected into all 10 beetles. You'll immediately notice them moving in a smarter way. Note: Those bugs are still quite dumb. At least they don't run in circles anymore. And
 they don't run into the walls all the time. - A full-time AI specialist could certainly tune the learning algorithm and the so-called
 hyperparameters to make them smarter 🤓</p>
 
@@ -90,6 +91,9 @@ hyperparameters to make them smarter 🤓</p>
 
     <p>The software uses <a href="https://github.com/karpathy/reinforcejs">open-source code</a> from the famous AI researcher <a href="https://cs.stanford.edu/people/karpathy/">Andrey Karpathy</a>. Thanks to him for his fascinating
     work and the generosity to share it with the community!</p>
+
+     <p>Silvan Mühlemann, 18. February 2018
+    </p>
 
 
     <textarea id="agentspec" style="width:100%;height:250px;" class="showOnlyOnDebug">
@@ -117,7 +121,7 @@ spec.num_hidden_units = 200 // number of neurons in hidden layer
             normal
         </button>
     <button class="btn btn-primary" onclick="loadAgent()"
-    >Load trained brains
+    >Inject trained brains
     </button>
         <button class="btn btn-info" onclick="showAdvanced()" >Advanced info
         </button>
@@ -142,15 +146,15 @@ spec.num_hidden_units = 200 // number of neurons in hidden layer
 
         <div id="expi"></div>
         <div id="tde"></div>
-    </div>
+
 
     <div id="flotreward" style="width:800px; height: 400px;" class="showOnlyOnDebug"></div>
+    <p>Moving average of the reward</p>
+         </div>
 
     <textarea id="mysterybox" style="width:100%;display:none;" class="showOnlyOnDebug">mystery text box</textarea>
 
-    <p>
-       <br> Silvan Mühlemann, 18. February 2018
-    </p>
+
 
 </div>
 </body>
