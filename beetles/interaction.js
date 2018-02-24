@@ -396,9 +396,8 @@ function start() {
         dataType: 'json',
         success: function (data) {
             for (var k = 0; k < numAgents; k++) {
-                var names = data.filter(function(name) { return name.length < 6; } )
-
-                var a = new Agent(names[Math.floor(Math.random()*names.length) ]);
+                var name = data.splice(Math.floor(Math.random()*data.length), 1)
+                var a = new Agent(name);
                 env = a;
                 a.brain = new RL.DQNAgent(env, spec); // give agent a TD brain
                 //a.brain = new RL.RecurrentReinforceAgent(env, {});
