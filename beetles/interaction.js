@@ -114,8 +114,7 @@ function draw() {
         rotateAndPaintImage(ctx, a === leader ? bugWithStarImage : carImage, a.angle, a.op.x, a.op.y, 10, 10, 25)
         ctx.font = "15px -apple-system,Sans-Serif";
 
-        if (DEBUG)
-            ctx.fillText(a.id, a.op.x + 15, a.op.y);
+        ctx.fillText(a.id, a.op.x + 15, a.op.y);
         ctx.fillText((a.totalReward * 5 + 1000).toFixed(0), a.op.x + 15, a.op.y + 15);
 
         if (a.visCollisionInfo !== null) {
@@ -147,10 +146,10 @@ function draw() {
             //ctx.drawImage(starImage, star.pos.x - 20, star.pos.y - 20 - size, starImage.width, starImage.height, 0, 0, size, size);
             if (star.type === 'badwall') {
                 //ctx.drawImage(starImage, star.pos.x, star.pos.y - 20, size, size);
-                let size = (10 - star.ticks) * 4
-                ctx.fillStyle = "#000000";
+                let size = (20 - star.ticks) * 4
+                ctx.fillStyle = "#bc4848";
                 ctx.font = "20px -apple-system,Sans-Serif";
-                ctx.fillText("-1", star.pos.x + size, star.pos.y);
+                ctx.fillText("-1", star.pos.x + size, star.pos.y + 2);
             } else {
                 let size = (20 - star.ticks) * 4
                 ctx.fillStyle = "#ffbe06";
@@ -391,30 +390,40 @@ function start() {
 
     w = new World();
     w.agents = [];
-    for (var k = 0; k < numAgents; k++) {
-        var a = new Agent(k);
-        env = a;
-        a.brain = new RL.DQNAgent(env, spec); // give agent a TD brain
-        //a.brain = new RL.RecurrentReinforceAgent(env, {});
-        w.agents.push(a);
-        smooth_reward_history.push([]);
-    }
 
-    $("#slider").slider({
-        min: 0,
-        max: 1,
-        value: w.agents[0].brain.epsilon,
-        step: 0.01,
-        slide: function (event, ui) {
-            w.agents[0].brain.epsilon = ui.value;
-            $("#eps").html(ui.value.toFixed(2));
+    $.ajax({
+        url: 'first-names.json',
+        dataType: 'json',
+        success: function (data) {
+            for (var k = 0; k < numAgents; k++) {
+                var names = data.filter(function(name) { return name.length < 6; } )
+
+                var a = new Agent(names[Math.floor(Math.random()*names.length) ]);
+                env = a;
+                a.brain = new RL.DQNAgent(env, spec); // give agent a TD brain
+                //a.brain = new RL.RecurrentReinforceAgent(env, {});
+                w.agents.push(a);
+                smooth_reward_history.push([]);
+            }
+
+            $("#slider").slider({
+                min: 0,
+                max: 1,
+                value: w.agents[0].brain.epsilon,
+                step: 0.01,
+                slide: function (event, ui) {
+                    w.agents[0].brain.epsilon = ui.value;
+                    $("#eps").html(ui.value.toFixed(2));
+                }
+            });
+            $("#eps").html(w.agents[0].brain.epsilon.toFixed(2));
+            $("#slider").slider('value', w.agents[0].brain.epsilon);
+
+            initFlot();
+            gonormal();
         }
     });
-    $("#eps").html(w.agents[0].brain.epsilon.toFixed(2));
-    $("#slider").slider('value', w.agents[0].brain.epsilon);
 
-    initFlot();
-    gonormal();
 
 }
 
